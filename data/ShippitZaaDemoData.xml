@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<entity-facade-xml type="demo">
+
+    <!-- creating demo carrier data for shippit carrier -->
+    <mantle.party.Party partyId="Shippit" partyTypeEnumId="PtyOrganization" externalId="shippit">
+        <organization organizationName="Shippit"/>
+        <roles roleTypeId="Carrier"/>
+    </mantle.party.Party>
+
+    <mantle.shipment.carrier.CarrierShipmentMethod carrierPartyId="Shippit" shipmentMethodEnumId="ShMthThirdDay" sequenceNum="1"
+                                                   description="Shippit 2nd Day Delivery"  gatewayServiceCode="express"/>
+    <mantle.shipment.carrier.CarrierShipmentMethod carrierPartyId="Shippit" shipmentMethodEnumId="ShMthGround" sequenceNum="2"
+                                                   description="Shippit Ground Home Delivery" scaCode="FDXG" gatewayServiceCode="standard"/>
+    <mantle.shipment.carrier.CarrierShipmentMethod carrierPartyId="Shippit" shipmentMethodEnumId="ShMthNextDayPri" sequenceNum="3"
+                                                   description="Shippit Same Day Delivery"  gatewayServiceCode="priority"/>
+    <mantle.shipment.carrier.CarrierShipmentMethod carrierPartyId="Shippit" shipmentMethodEnumId="ShMthOnDemand" sequenceNum="4"
+                                                   description="Shippit On-demand Delivery"  gatewayServiceCode="click_and_collect"/>
+
+
+    <mantle.shipment.carrier.ShippingGatewayConfig shippingGatewayConfigId="Shippit_DEMO"
+                                                   shippingGatewayTypeEnumId="ShGtwyShippit" description="Shippit API Demo"
+                                                   getRateServiceName="mantle.ShippitServices.post#ShippingRate"
+                                                   requestLabelsServiceName="mantle.ShippitServices.get#CreateLabel">
+
+
+        <!-- set your Shippit Account IDs for carriers with records like these -->
+        <methods carrierPartyId="Shippit" shipmentMethodEnumId="ShMthThirdDay" gatewayServiceCode="express"/>
+        <methods carrierPartyId="Shippit" shipmentMethodEnumId="ShMthGround" gatewayServiceCode="standard"/>
+        <methods carrierPartyId="Shippit" shipmentMethodEnumId="ShMthNextDayPri" gatewayServiceCode="priority"/>
+        <methods carrierPartyId="Shippit" shipmentMethodEnumId="ShMthOnDemand" gatewayServiceCode="click_and_collect"/>
+
+        <!--  set your Shippit API token (test or live) with a record like this  -->
+        <options optionEnumId="SgoApiToken" optionValue=""/>
+
+    </mantle.shipment.carrier.ShippingGatewayConfig>
+
+    <!--  used in mantle.shipment.CarrierServices ShipmentLabels services  -->
+    <moqui.security.UserGroupPreference userGroupId="ALL_USERS" preferenceKey="ValidateAddressGatewayConfigId" preferenceValue="Shippit_DEMO"/>
+    <moqui.security.UserGroupPreference userGroupId="ALL_USERS" preferenceKey="DefaultShipmentGatewayConfigId" preferenceValue="Shippit_DEMO"/>
+
+    <!--  example per org/vendor settings, used as defaults if not store; note that for screens like EditParty with no store or
+            vendor the Owner Party must be set to use these settings  -->
+    <mantle.party.PartySetting partyId="ORG_ZIZI_RETAIL" partySettingTypeId="ValidateAddressGatewayConfigId" settingValue="Shippit_DEMO"/>
+    <mantle.party.PartySetting partyId="ORG_ZIZI_RETAIL" partySettingTypeId="DefaultShipmentGatewayConfigId" settingValue="Shippit_DEMO"/>
+
+    <mantle.product.store.ProductStore productStoreId="POPC_DEFAULT">
+        <shipOptions carrierPartyId="Shippit" shipmentMethodEnumId="ShMthThirdDay" />
+        <shipOptions carrierPartyId="Shippit" shipmentMethodEnumId="ShMthGround" />
+        <shipOptions carrierPartyId="Shippit" shipmentMethodEnumId="ShMthNextDayPri" />
+        <shipOptions carrierPartyId="Shippit" shipmentMethodEnumId="ShMthOnDemand" />
+    </mantle.product.store.ProductStore>
+
+</entity-facade-xml>
