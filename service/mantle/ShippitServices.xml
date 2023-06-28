@@ -14,9 +14,7 @@
             <parameter name="shipmentPackageSeqId" default-value="01"/>
         </in-parameters>
         <out-parameters>
-            <parameter name="requestMap"/>
             <parameter name="responseMap"/>
-            <parameter name="errMsg"/>
         </out-parameters>
         <actions>
 
@@ -36,15 +34,7 @@
             <if condition="shipment == null"><return error="true" message="Shipment not found with ID ${shipmentId}"/></if>
             <entity-find-one entity-name="mantle.shipment.ShipmentRouteSegment" value-field="routeSegment"/>
             <if condition="routeSegment == null"><return error="true" message="Shipment Route Segment not found with ID ${shipmentId}:${shipmentRouteSegmentSeqId}"/></if>
-
-            <set field="destPostalContactMechId" from="routeSegment.destPostalContactMechId"/>\
-
-            <set field="hasIssues" from="false"/>
-            <set field="fromPartyId" from="shipment.fromPartyId"/>
-            <if condition="!fromPartyId"><set field="hasIssues" from="true"/><message type="danger">From party not set on shipment ${shipmentId}</message></if>
-            <set field="toPartyId" from="shipment.toPartyId"/>
-            <if condition="!toPartyId"><set field="hasIssues" from="true"/><message type="danger">To party not set on shipment ${shipmentId}</message></if>
-            <if condition="hasIssues"><message type="danger">Issues found, not requesting Shippo labels</message><return/></if>
+            <set field="destPostalContactMechId" from="routeSegment.destPostalContactMechId"/>
 
             <if condition="!destPostalContactMechId &amp;&amp; routeSegment.destinationFacilityId">
                 <service-call name="mantle.facility.ContactServices.get#FacilityDefaultShipDest" out-map="facOriginOut"
@@ -55,9 +45,6 @@
                     <entity-update value-field="routeSegment"/>
                 </if>
             </if>
-            <if condition="!routeSegment.carrierPartyId"><log level="warn" message="This ShipmentID ===${shipmentId}=== has no carrierPartyId, not getting rates"/></if>
-<!--                      <log level="info" message="=================${routeSegment}==================="/>-->
-
 
             <!--  ==============  Weight  ==============  -->
 
@@ -77,17 +64,12 @@
 
             <!--  ==============  Address_to  ==============  -->
 
-            <if condition="destPostalContactMechId"><then>
-                <entity-find-one entity-name="mantle.party.contact.PostalAddress" value-field="destAddress">
-                    <field-map field-name="contactMechId" from="routeSegment.destPostalContactMechId"/>
-                </entity-find-one>
-                <entity-find-one entity-name="moqui.basic.Geo" value-field="destState">
-                    <field-map field-name="geoId" from="destAddress.stateProvinceGeoId"/>
-                </entity-find-one>
-<!--                         <log level="info" message="=================${destAddress}==================="/>-->
-            </then><else>
-                <message error="true">No destination address set on Shipment Route Segment ${shipmentId}:${shipmentRouteSegmentSeqId}</message>
-            </else></if>
+            <entity-find-one entity-name="mantle.party.contact.PostalAddress" value-field="destAddress">
+                <field-map field-name="contactMechId" from="routeSegment.destPostalContactMechId"/>
+            </entity-find-one>
+            <entity-find-one entity-name="moqui.basic.Geo" value-field="destState">
+                <field-map field-name="geoId" from="destAddress.stateProvinceGeoId"/>
+            </entity-find-one>
 
             <set field="parcel" from="[qty:orderItem.quantity,weight:shipmentPackage.weight]"/>
             <set field="parcel_attributes" from="[parcel]"/>
@@ -101,10 +83,7 @@
                             .addHeader("Authorization", "Bearer ${apiToken}")
                     restClient.uri().protocol("https").host("app.staging.shippit.com").port(443).path("api/3/quotes").build()
                     org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
-                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
-                        errMsg = restResponse.text()
-                        return
-                    }
+                   if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) { ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}") return }
                     responseMap = restResponse.jsonObject()
                 ]]>
             </script>
@@ -129,9 +108,7 @@
             <parameter name="shipmentPackageSeqId" default-value="01"/>
         </in-parameters>
         <out-parameters>
-            <parameter name="requestMap"/>
             <parameter name="responseMap"/>
-            <parameter name="errMsg"/>
         </out-parameters>
         <actions>
 
@@ -151,15 +128,9 @@
             <if condition="shipment == null"><return error="true" message="Shipment not found with ID ${shipmentId}"/></if>
             <entity-find-one entity-name="mantle.shipment.ShipmentRouteSegment" value-field="routeSegment"/>
             <if condition="routeSegment == null"><return error="true" message="Shipment Route Segment not found with ID ${shipmentId}:${shipmentRouteSegmentSeqId}"/></if>
+            <set field="destPostalContactMechId" from="routeSegment.destPostalContactMechId"/>
 
-            <set field="destPostalContactMechId" from="routeSegment.destPostalContactMechId"/>\
 
-            <set field="hasIssues" from="false"/>
-            <set field="fromPartyId" from="shipment.fromPartyId"/>
-            <if condition="!fromPartyId"><set field="hasIssues" from="true"/><message type="danger">From party not set on shipment ${shipmentId}</message></if>
-            <set field="toPartyId" from="shipment.toPartyId"/>
-            <if condition="!toPartyId"><set field="hasIssues" from="true"/><message type="danger">To party not set on shipment ${shipmentId}</message></if>
-            <if condition="hasIssues"><message type="danger">Issues found, not requesting Shippo labels</message><return/></if>
             <if condition="!destPostalContactMechId &amp;&amp; routeSegment.destinationFacilityId">
                 <service-call name="mantle.facility.ContactServices.get#FacilityDefaultShipDest" out-map="facOriginOut"
                               in-map="[facilityId:routeSegment.destinationFacilityId]"/>
@@ -170,7 +141,6 @@
                 </if>
             </if>
             <if condition="!routeSegment.carrierPartyId"><log level="warn" message="This ShipmentID ===${shipmentId}=== has no carrierPartyId, not getting rates"/></if>
-<!--                      <log level="info" message="=================${routeSegment}==================="/>-->
 
 
             <!--  ==============  Weight  ==============  -->
@@ -198,22 +168,18 @@
             </entity-find-one>
             <set field="method" from="gatewayMethod.gatewayServiceCode"/>
             <if condition="!method"><log level="warn" message="Shipping Gateway ${shippingGatewayConfigId} has no carrierId, not getting rates"/><return/></if>
-<!--            <log level="info" message="=================${carrierIds}==================="/>-->
 
 
             <!--  ==============  Address_to  ==============  -->
 
-            <if condition="destPostalContactMechId"><then>
-                <entity-find-one entity-name="mantle.party.contact.PostalAddress" value-field="destAddress">
-                    <field-map field-name="contactMechId" from="routeSegment.destPostalContactMechId"/>
-                </entity-find-one>
-                <entity-find-one entity-name="moqui.basic.Geo" value-field="destState">
-                    <field-map field-name="geoId" from="destAddress.stateProvinceGeoId"/>
-                </entity-find-one>
-<!--                         <log level="info" message="=================${destAddress}==================="/>-->
-            </then><else>
-                <message error="true">No destination address set on Shipment Route Segment ${shipmentId}:${shipmentRouteSegmentSeqId}</message>
-            </else></if>
+
+            <entity-find-one entity-name="mantle.party.contact.PostalAddress" value-field="destAddress">
+                <field-map field-name="contactMechId" from="routeSegment.destPostalContactMechId"/>
+            </entity-find-one>
+            <entity-find-one entity-name="moqui.basic.Geo" value-field="destState">
+                <field-map field-name="geoId" from="destAddress.stateProvinceGeoId"/>
+            </entity-find-one>
+
 
             <entity-find-one entity-name="mantle.order.OrderPart" value-field="orderPart">
                 <field-map field-name="orderId" />
@@ -251,10 +217,7 @@
                             .addHeader("Authorization", "Bearer ${apiToken}")
                     restClient.uri().protocol("https").host("app.staging.shippit.com").port(443).path("api/3/orders").build()
                     org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
-                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
-                        errMsg = restResponse.text()
-                        return
-                    }
+                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) { ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}") return }
                     responseMap = restResponse.jsonObject()
                 ]]>
             </script>
@@ -286,7 +249,6 @@
         </in-parameters>
         <out-parameters>
             <parameter name="responseMap"/>
-            <parameter name="errMsg"/>
         </out-parameters>
         <actions>
 
@@ -327,10 +289,7 @@
                             .addHeader("Authorization", "Bearer ${apiToken}")
                     restClient.uri().protocol("https").host("app.staging.shippit.com").port(443).path("api/3/orders/${trackingNumber}/label").build()
                     org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
-                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
-                        errMsg = restResponse.text()
-                        return
-                    }
+                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) { ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}") return }
                     responseMap = restResponse.jsonObject()
                 ]]>
             </script>
@@ -362,7 +321,6 @@
         </in-parameters>
         <out-parameters>
             <parameter name="responseMap"/>
-            <parameter name="errMsg"/>
         </out-parameters>
         <actions>
 
@@ -404,10 +362,7 @@
                             .addHeader("Authorization", "Bearer ${apiToken}")
                     restClient.uri().protocol("https").host("app.staging.shippit.com").port(443).path("api/3/orders/${trackingNumber}").build()
                     org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
-                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
-                        errMsg = restResponse.text()
-                        return
-                    }
+                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) { ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}") return }
                     responseMap = restResponse.jsonObject()
                 ]]>
             </script>
