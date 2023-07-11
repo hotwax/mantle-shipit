@@ -7,11 +7,9 @@
     <service verb="post" noun="ShippingRate">
         <implements service="mantle.shipment.CarrierServices.get#ShippingRate"/>
         <in-parameters>
-            <parameter name="shippingGatewayConfigId" default-value="Shippit_DEMO"/>
+            <parameter name="shippingGatewayConfigId" required="true"/>
             <parameter name="orderId"/>
             <parameter name="orderItemSeqId"/>
-            <parameter name="shipmentRouteSegmentSeqId" default-value="01"/>
-            <parameter name="shipmentPackageSeqId" default-value="01"/>
         </in-parameters>
         <out-parameters>
             <parameter name="responseMap"/>
@@ -24,16 +22,23 @@
                 <field-map field-name="shippingGatewayConfigId"/>
                 <field-map field-name="optionEnumId" value="SgoApiToken"/>
             </entity-find-one>
+            <if condition="!apiTokenOpt">
+                <log level="error" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
+                <return/>
+            </if>
             <set field="apiToken" from="apiTokenOpt?.optionValue"/>
-            <if condition="!apiToken"><log level="warn" message="Shipping gateway ===${shippingGatewayConfigId}=== has no SgoApiToken, not getting rates"/><return/></if>
 
 
             <!-- ==============  Shipment_Record  ============== -->
 
             <entity-find-one entity-name="mantle.shipment.Shipment" value-field="shipment" for-update="true"/>
-            <if condition="shipment == null"><return error="true" message="Shipment not found with ID ${shipmentId}"/></if>
+            <if condition="shipment == null">
+                <return error="true" message="Shipment not found with ID ${shipmentId}"/>
+            </if>
             <entity-find-one entity-name="mantle.shipment.ShipmentRouteSegment" value-field="routeSegment"/>
-            <if condition="routeSegment == null"><return error="true" message="Shipment Route Segment not found with ID ${shipmentId}:${shipmentRouteSegmentSeqId}"/></if>
+            <if condition="routeSegment == null">
+                <return error="true" message="Shipment Route Segment not found with ID ${shipmentId}:${shipmentRouteSegmentSeqId}"/>
+            </if>
             <set field="destPostalContactMechId" from="routeSegment.destPostalContactMechId"/>
 
             <if condition="!destPostalContactMechId &amp;&amp; routeSegment.destinationFacilityId">
@@ -52,8 +57,12 @@
                 <field-map field-name="shipmentId"/>
                 <field-map field-name="shipmentPackageSeqId"/>
             </entity-find-one>
+            <if condition="!shipmentPackage">
+                <log level="error" message="This shipmentId ${shipmentId} has no Shipment package, not getting rates"/>
+                <return/>
+            </if>
             <if condition="!shipmentPackage.weightUomId">
-                <log level="warn" message="This shipmentId ===${shipmentId}=== has no Shipment package, not getting rates"/>
+                <log level="error" message="This shipmentId ${shipmentId} has no weightUomId in Shipment package, not getting rates"/>
                 <return/>
             </if>
             <entity-find-one entity-name="mantle.order.OrderItem" value-field="orderItem">
@@ -71,19 +80,21 @@
                 <field-map field-name="geoId" from="destAddress.stateProvinceGeoId"/>
             </entity-find-one>
 
-            <set field="parcel" from="[qty:orderItem.quantity,weight:shipmentPackage.weight]"/>
-            <set field="parcel_attributes" from="[parcel]"/>
-            <set field="quote" from="[dropoff_postcode:destAddress.postalCode,dropoff_state:destState.geoCodeAlpha2,dropoff_suburb:destAddress.city,parcel_attributes:parcel_attributes]"/>
-            <set field="requestMap" from="[quote:quote]"/>
+            <set field="requestMap" from="[quote:[dropoff_postcode:destAddress.postalCode,dropoff_state:destState.geoCodeAlpha2,
+                        dropoff_suburb:destAddress.city,parcel_attributes:[[qty:orderItem.quantity,weight:shipmentPackage.weight]]]]"/>
 
             <script>
                 <![CDATA[
                     org.moqui.util.RestClient restClient = ec.service.rest().method(org.moqui.util.RestClient.POST)
-                            .addHeader("Content-Type", "application/json").jsonObject(requestMap)
-                            .addHeader("Authorization", "Bearer ${apiToken}")
-                    restClient.uri().protocol("https").host("app.staging.shippit.com").port(443).path("api/3/quotes").build()
+                    .addHeader("Content-Type", "application/json").jsonObject(requestMap)
+                    .addHeader("Authorization", "Bearer ${apiToken}")
+                    restClient.uri().protocol("https")
+                    .host("app.staging.shippit.com").port(443).path("api/3/quotes").build()
                     org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
-                   if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) { ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}") return }
+                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
+                        ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}")
+                        return
+                    }
                     responseMap = restResponse.jsonObject()
                 ]]>
             </script>
@@ -100,12 +111,12 @@
     <service verb="post" noun="CreateOrder">
         <implements service="mantle.shipment.CarrierServices.get#ShippingRate"/>
         <in-parameters>
-            <parameter name="shippingGatewayConfigId" default-value="Shippit_DEMO"/>
+            <parameter name="shippingGatewayConfigId" required="true"/>
             <parameter name="orderId"/>
-            <parameter name="orderItemSeqId" default-value="02"/>
+            <parameter name="orderItemSeqId" required="true"/>
             <parameter name="orderPartSeqId"/>
-            <parameter name="shipmentRouteSegmentSeqId" default-value="01"/>
-            <parameter name="shipmentPackageSeqId" default-value="01"/>
+            <parameter name="shipmentRouteSegmentSeqId" required="true"/>
+            <parameter name="shipmentPackageSeqId" required="true"/>
         </in-parameters>
         <out-parameters>
             <parameter name="responseMap"/>
@@ -118,16 +129,22 @@
                 <field-map field-name="shippingGatewayConfigId"/>
                 <field-map field-name="optionEnumId" value="SgoApiToken"/>
             </entity-find-one>
+            <if condition="!apiTokenOpt">
+                <log level="error" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
+                <return/>
+            </if>
             <set field="apiToken" from="apiTokenOpt?.optionValue"/>
-            <if condition="!apiToken"><log level="warn" message="Shipping gateway ===${shippingGatewayConfigId}=== has no SgoApiToken, not getting rates"/><return/></if>
-
 
             <!-- ==============  Shipment_Record  ============== -->
 
             <entity-find-one entity-name="mantle.shipment.Shipment" value-field="shipment" for-update="true"/>
-            <if condition="shipment == null"><return error="true" message="Shipment not found with ID ${shipmentId}"/></if>
+            <if condition="shipment == null">
+                <return error="true" message="Shipment not found with ID ${shipmentId}"/>
+            </if>
             <entity-find-one entity-name="mantle.shipment.ShipmentRouteSegment" value-field="routeSegment"/>
-            <if condition="routeSegment == null"><return error="true" message="Shipment Route Segment not found with ID ${shipmentId}:${shipmentRouteSegmentSeqId}"/></if>
+            <if condition="routeSegment == null">
+                <return error="true" message="Shipment Route Segment not found with ID ${shipmentId}:${shipmentRouteSegmentSeqId}"/>
+            </if>
             <set field="destPostalContactMechId" from="routeSegment.destPostalContactMechId"/>
 
 
@@ -140,7 +157,9 @@
                     <entity-update value-field="routeSegment"/>
                 </if>
             </if>
-            <if condition="!routeSegment.carrierPartyId"><log level="warn" message="This ShipmentID ===${shipmentId}=== has no carrierPartyId, not getting rates"/></if>
+            <if condition="!routeSegment.carrierPartyId">
+                <log level="error" message="This ShipmentID ${shipmentId} has no carrierPartyId, not getting rates"/>
+            </if>
 
 
             <!--  ==============  Weight  ==============  -->
@@ -149,15 +168,18 @@
                 <field-map field-name="shipmentId"/>
                 <field-map field-name="shipmentPackageSeqId"/>
             </entity-find-one>
+            <if condition="!shipmentPackage">
+                <log level="error" message="This shipmentId ${shipmentId} has no Shipment package, not getting rates"/>
+                <return/>
+            </if>
             <if condition="!shipmentPackage.weightUomId">
-                <log level="warn" message="This shipmentId ===${shipmentId}=== has no Shipment package, not getting rates"/>
+                <log level="error" message="This shipmentId ${shipmentId} has no weightUomId in Shipment package, not getting rates"/>
                 <return/>
             </if>
             <entity-find-one entity-name="mantle.order.OrderItem" value-field="orderItem">
                 <field-map field-name="orderId" />
                 <field-map field-name="orderItemSeqId"/>
             </entity-find-one>
-
 
             <!--  ==============  Carrier_Id  ==============  -->
 
@@ -166,12 +188,17 @@
                 <field-map field-name="carrierPartyId" from="routeSegment.carrierPartyId"/>
                 <field-map field-name="shipmentMethodEnumId" from="routeSegment.shipmentMethodEnumId"/>
             </entity-find-one>
+            <if condition="!gatewayMethod">
+                <log level="error" message="Shipping Gateway ${shippingGatewayConfigId} has no carrier, not getting rates"/>
+                <return/>
+            </if>
             <set field="method" from="gatewayMethod.gatewayServiceCode"/>
-            <if condition="!method"><log level="warn" message="Shipping Gateway ${shippingGatewayConfigId} has no carrierId, not getting rates"/><return/></if>
-
+            <if condition="!method">
+                <log level="error" message="Shipping Gateway ${shippingGatewayConfigId} has no service code, not getting rates"/>
+                <return/>
+            </if>
 
             <!--  ==============  Address_to  ==============  -->
-
 
             <entity-find-one entity-name="mantle.party.contact.PostalAddress" value-field="destAddress">
                 <field-map field-name="contactMechId" from="routeSegment.destPostalContactMechId"/>
@@ -179,8 +206,6 @@
             <entity-find-one entity-name="moqui.basic.Geo" value-field="destState">
                 <field-map field-name="geoId" from="destAddress.stateProvinceGeoId"/>
             </entity-find-one>
-
-
             <entity-find-one entity-name="mantle.order.OrderPart" value-field="orderPart">
                 <field-map field-name="orderId" />
                 <field-map field-name="orderPartSeqId"/>
@@ -203,21 +228,23 @@
             <set field="email" from="contactMech.infoString"/>
 
             -->
-
-            <set field="parcel" from="[qty:orderItem.quantity,weight:shipmentPackage.weight]"/>
-            <set field="parcel_attributes" from="[parcel]"/>
-            <set field="user_attributes" from="[email:'test@shippit.com',first_name:person.firstName,last_name:person.lastName]"/>
-            <set field="order" from="[courier_type:method, delivery_address:destAddress.address1, delivery_postcode:'2009', delivery_state:'NSW', delivery_suburb:'Pyrmont', parcel_attributes:parcel_attributes,user_attributes:user_attributes]"/>
-            <set field="requestMap" from="[order:order]"/>
+            <set field="requestMap" from="[order:[courier_type:method, delivery_address:destAddress.address1,
+                        delivery_postcode:'2009', delivery_state:'NSW', delivery_suburb:'Pyrmont',
+                        parcel_attributes:[[qty:orderItem.quantity,weight:shipmentPackage.weight]],
+                        user_attributes:[email:'test@shippit.com',first_name:person.firstName,last_name:person.lastName]]]"/>
 
             <script>
                 <![CDATA[
                     org.moqui.util.RestClient restClient = ec.service.rest().method(org.moqui.util.RestClient.POST)
-                            .addHeader("Content-Type", "application/json").jsonObject(requestMap)
-                            .addHeader("Authorization", "Bearer ${apiToken}")
-                    restClient.uri().protocol("https").host("app.staging.shippit.com").port(443).path("api/3/orders").build()
+                    .addHeader("Content-Type", "application/json").jsonObject(requestMap)
+                    .addHeader("Authorization", "Bearer ${apiToken}")
+                    restClient.uri().protocol("https")
+                    .host("app.staging.shippit.com").port(443).path("api/3/orders").build()
                     org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
-                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) { ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}") return }
+                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
+                        ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}")
+                        return
+                    }
                     responseMap = restResponse.jsonObject()
                 ]]>
             </script>
@@ -258,18 +285,26 @@
                 <field-map field-name="shippingGatewayConfigId"/>
                 <field-map field-name="optionEnumId" value="SgoApiToken"/>
             </entity-find-one>
+            <if condition="!apiTokenOpt">
+                <log level="error" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
+                <return/>
+            </if>
             <set field="apiToken" from="apiTokenOpt?.optionValue"/>
-            <if condition="!apiToken"><log level="warn" message="Shipping gateway ===${shippingGatewayConfigId}=== has no SgoApiToken, not getting rates"/><return/></if>
-
 
             <!-- ============== Shipment Record ============== -->
 
             <entity-find-one entity-name="mantle.shipment.Shipment" value-field="shipment" for-update="true"/>
-            <if condition="shipment == null"><return error="true" message="Shipment not found with ID ${shipmentId}"/></if>
+            <if condition="shipment == null">
+                <return error="true" message="Shipment not found with ID ${shipmentId}"/>
+            </if>
             <entity-find-one entity-name="mantle.shipment.ShipmentRouteSegment" value-field="routeSegment"/>
-            <if condition="routeSegment == null"><return error="true" message="Shipment Route Segment not found with ID ${shipmentId}:${shipmentRouteSegmentSeqId}"/></if>
+            <if condition="routeSegment == null">
+                <return error="true" message="Shipment Route Segment not found with ID ${shipmentId}:${shipmentRouteSegmentSeqId}"/>
+            </if>
             <entity-find-one entity-name="mantle.shipment.ShipmentPackage" value-field="packages"/>
-            <if condition="packages == null"><log level="warn" message="Shipment Package not found with ID ${shipmentId}:${shipmentPackageSeqId}"/></if>
+            <if condition="packages == null">
+                <log level="warn" message="Shipment Package not found with ID ${shipmentId}:${shipmentPackageSeqId}"/>
+            </if>
 
 
             <!-- ==============  Package Route Segment  ============== -->
@@ -279,17 +314,26 @@
                 <field-map field-name="shipmentRouteSegmentSeqId"/>
                 <field-map field-name="shipmentPackageSeqId" />
             </entity-find-one>
-            <if condition="!packageRouteSeg.trackingCode"><return error="true" message="Tracking number not found with Shipment Package ${shipmentId}:${shipmentPackageSeqId}"/></if>
+            <if condition="!packageRouteSeg">
+                <return error="true" message="Package Route Segment not found with Shipment Package ${shipmentId}:${shipmentPackageSeqId}"/>
+            </if>
+            <if condition="!packageRouteSeg.trackingCode">
+                <return error="true" message="Tracking number not found with Shipment Package ${shipmentId}:${shipmentPackageSeqId}"/>
+            </if>
             <set field="trackingNumber" from="packageRouteSeg.trackingCode"/>
 
             <script>
                 <![CDATA[
                     org.moqui.util.RestClient restClient = ec.service.rest().method(org.moqui.util.RestClient.GET)
-                            .addHeader("Content-Type", "application/json").jsonObject(requestMap)
-                            .addHeader("Authorization", "Bearer ${apiToken}")
-                    restClient.uri().protocol("https").host("app.staging.shippit.com").port(443).path("api/3/orders/${trackingNumber}/label").build()
+                    .addHeader("Content-Type", "application/json").jsonObject(requestMap)
+                    .addHeader("Authorization", "Bearer ${apiToken}")
+                    restClient.uri().protocol("https")
+                    .host("app.staging.shippit.com").port(443).path("api/3/orders/${trackingNumber}/label").build()
                     org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
-                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) { ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}") return }
+                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
+                        ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}")
+                        return
+                    }
                     responseMap = restResponse.jsonObject()
                 ]]>
             </script>
@@ -330,18 +374,27 @@
                 <field-map field-name="shippingGatewayConfigId"/>
                 <field-map field-name="optionEnumId" value="SgoApiToken"/>
             </entity-find-one>
+            <if condition="!apiTokenOpt">
+                <log level="error" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
+                <return/>
+            </if>
             <set field="apiToken" from="apiTokenOpt?.optionValue"/>
-            <if condition="!apiToken"><log level="warn" message="Shipping gateway ===${shippingGatewayConfigId}=== has no SgoApiToken, not getting rates"/><return/></if>
 
 
             <!-- ============== Shipment Record ============== -->
 
             <entity-find-one entity-name="mantle.shipment.Shipment" value-field="shipment" for-update="true"/>
-            <if condition="shipment == null"><return error="true" message="Shipment not found with ID ${shipmentId}"/></if>
+            <if condition="shipment == null">
+                <return error="true" message="Shipment not found with ID ${shipmentId}"/>
+            </if>
             <entity-find-one entity-name="mantle.shipment.ShipmentRouteSegment" value-field="routeSegment"/>
-            <if condition="routeSegment == null"><return error="true" message="Shipment Route Segment not found with ID ${shipmentId}:${shipmentRouteSegmentSeqId}"/></if>
+            <if condition="routeSegment == null">
+                <return error="true" message="Shipment Route Segment not found with ID ${shipmentId}:${shipmentRouteSegmentSeqId}"/>
+            </if>
             <entity-find-one entity-name="mantle.shipment.ShipmentPackage" value-field="packages"/>
-            <if condition="packages == null"><log level="warn" message="Shipment Package not found with ID ${shipmentId}:${shipmentPackageSeqId}"/></if>
+            <if condition="packages == null">
+                <log level="warn" message="Shipment Package not found with ID ${shipmentId}:${shipmentPackageSeqId}"/>
+            </if>
 
 
             <!-- ==============  Package Route Segment  ============== -->
@@ -351,6 +404,7 @@
                 <field-map field-name="shipmentRouteSegmentSeqId"/>
                 <field-map field-name="shipmentPackageSeqId" />
             </entity-find-one>
+            <if condition="!packageRouteSeg"><return error="true" message="Package Route Segment not found with Shipment Package ${shipmentId}:${shipmentPackageSeqId}"/></if>
             <if condition="!packageRouteSeg.trackingCode"><return error="true" message="Tracking number not found with Shipment Package ${shipmentId}:${shipmentPackageSeqId}"/></if>
             <set field="trackingNumber" from="packageRouteSeg.trackingCode"/>
 
@@ -358,15 +412,18 @@
             <script>
                 <![CDATA[
                     org.moqui.util.RestClient restClient = ec.service.rest().method(org.moqui.util.RestClient.DELETE)
-                            .addHeader("Content-Type", "application/json").jsonObject(requestMap)
-                            .addHeader("Authorization", "Bearer ${apiToken}")
-                    restClient.uri().protocol("https").host("app.staging.shippit.com").port(443).path("api/3/orders/${trackingNumber}").build()
+                    .addHeader("Content-Type", "application/json").jsonObject(requestMap)
+                    .addHeader("Authorization", "Bearer ${apiToken}")
+                    restClient.uri().protocol("https")
+                    .host("app.staging.shippit.com").port(443).path("api/3/orders/${trackingNumber}").build()
                     org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
-                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) { ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}") return }
+                    if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
+                        ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}")
+                        return
+                    }
                     responseMap = restResponse.jsonObject()
                 ]]>
             </script>
         </actions>
     </service>
-
 </services>
