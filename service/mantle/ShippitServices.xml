@@ -7,7 +7,6 @@
     <service verb="post" noun="ShippingRate">
         <implements service="mantle.shipment.CarrierServices.get#ShippingRate"/>
         <in-parameters>
-            <parameter name="shippingGatewayConfigId" required="true"/>
             <parameter name="orderId"/>
             <parameter name="orderItemSeqId"/>
         </in-parameters>
@@ -61,14 +60,18 @@
                 <log level="error" message="This shipmentId ${shipmentId} has no Shipment package, not getting rates"/>
                 <return/>
             </if>
-            <if condition="!shipmentPackage.weightUomId">
-                <log level="error" message="This shipmentId ${shipmentId} has no weightUomId in Shipment package, not getting rates"/>
+            <if condition="!shipmentPackage.weight">
+                <log level="error" message="This shipmentId ${shipmentId} has no weight in Shipment package, not getting rates"/>
                 <return/>
             </if>
             <entity-find-one entity-name="mantle.order.OrderItem" value-field="orderItem">
                 <field-map field-name="orderId" />
                 <field-map field-name="orderItemSeqId"/>
             </entity-find-one>
+            <if condition="!orderItem.quantity">
+                <log level="error" message="This shipmentId ${shipmentId} has no quantity in Order Item, not getting rates"/>
+                <return/>
+            </if>
 
 
             <!--  ==============  Address_to  ==============  -->
@@ -84,13 +87,15 @@
                         dropoff_suburb:destAddress.city,parcel_attributes:[[qty:orderItem.quantity,weight:shipmentPackage.weight]]]]"/>
 
             <script>
+                import org.moqui.util.RestClient
+                import org.moqui.util.RestClient.RestResponse
                 <![CDATA[
-                    org.moqui.util.RestClient restClient = ec.service.rest().method(org.moqui.util.RestClient.POST)
+                    RestClient restClient = ec.service.rest().method(RestClient.POST)
                     .addHeader("Content-Type", "application/json").jsonObject(requestMap)
                     .addHeader("Authorization", "Bearer ${apiToken}")
                     restClient.uri().protocol("https")
                     .host("app.staging.shippit.com").port(443).path("api/3/quotes").build()
-                    org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
+                    RestClient.RestResponse restResponse = restClient.call()
                     if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
                         ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}")
                         return
@@ -111,12 +116,9 @@
     <service verb="post" noun="CreateOrder">
         <implements service="mantle.shipment.CarrierServices.get#ShippingRate"/>
         <in-parameters>
-            <parameter name="shippingGatewayConfigId" required="true"/>
             <parameter name="orderId"/>
             <parameter name="orderItemSeqId" required="true"/>
             <parameter name="orderPartSeqId"/>
-            <parameter name="shipmentRouteSegmentSeqId" required="true"/>
-            <parameter name="shipmentPackageSeqId" required="true"/>
         </in-parameters>
         <out-parameters>
             <parameter name="responseMap"/>
@@ -172,8 +174,8 @@
                 <log level="error" message="This shipmentId ${shipmentId} has no Shipment package, not getting rates"/>
                 <return/>
             </if>
-            <if condition="!shipmentPackage.weightUomId">
-                <log level="error" message="This shipmentId ${shipmentId} has no weightUomId in Shipment package, not getting rates"/>
+            <if condition="!shipmentPackage.weight">
+                <log level="error" message="This shipmentId ${shipmentId} has no weight in Shipment package, not getting rates"/>
                 <return/>
             </if>
             <entity-find-one entity-name="mantle.order.OrderItem" value-field="orderItem">
@@ -192,11 +194,11 @@
                 <log level="error" message="Shipping Gateway ${shippingGatewayConfigId} has no carrier, not getting rates"/>
                 <return/>
             </if>
-            <set field="method" from="gatewayMethod.gatewayServiceCode"/>
-            <if condition="!method">
+            <if condition="!gatewayMethod.gatewayServiceCode">
                 <log level="error" message="Shipping Gateway ${shippingGatewayConfigId} has no service code, not getting rates"/>
                 <return/>
             </if>
+            <set field="method" from="gatewayMethod.gatewayServiceCode"/>
 
             <!--  ==============  Address_to  ==============  -->
 
@@ -234,13 +236,15 @@
                         user_attributes:[email:'test@shippit.com',first_name:person.firstName,last_name:person.lastName]]]"/>
 
             <script>
+                import org.moqui.util.RestClient
+                import org.moqui.util.RestClient.RestResponse
                 <![CDATA[
-                    org.moqui.util.RestClient restClient = ec.service.rest().method(org.moqui.util.RestClient.POST)
+                    RestClient restClient = ec.service.rest().method(RestClient.POST)
                     .addHeader("Content-Type", "application/json").jsonObject(requestMap)
                     .addHeader("Authorization", "Bearer ${apiToken}")
                     restClient.uri().protocol("https")
                     .host("app.staging.shippit.com").port(443).path("api/3/orders").build()
-                    org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
+                    RestClient.RestResponse restResponse = restClient.call()
                     if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
                         ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}")
                         return
@@ -323,13 +327,15 @@
             <set field="trackingNumber" from="packageRouteSeg.trackingCode"/>
 
             <script>
+                import org.moqui.util.RestClient
+                import org.moqui.util.RestClient.RestResponse
                 <![CDATA[
-                    org.moqui.util.RestClient restClient = ec.service.rest().method(org.moqui.util.RestClient.GET)
+                    RestClient restClient = ec.service.rest().method(RestClient.GET)
                     .addHeader("Content-Type", "application/json").jsonObject(requestMap)
                     .addHeader("Authorization", "Bearer ${apiToken}")
                     restClient.uri().protocol("https")
                     .host("app.staging.shippit.com").port(443).path("api/3/orders/${trackingNumber}/label").build()
-                    org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
+                    RestClient.RestResponse restResponse = restClient.call()
                     if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
                         ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}")
                         return
@@ -404,19 +410,25 @@
                 <field-map field-name="shipmentRouteSegmentSeqId"/>
                 <field-map field-name="shipmentPackageSeqId" />
             </entity-find-one>
-            <if condition="!packageRouteSeg"><return error="true" message="Package Route Segment not found with Shipment Package ${shipmentId}:${shipmentPackageSeqId}"/></if>
-            <if condition="!packageRouteSeg.trackingCode"><return error="true" message="Tracking number not found with Shipment Package ${shipmentId}:${shipmentPackageSeqId}"/></if>
+            <if condition="!packageRouteSeg">
+                <return error="true" message="Package Route Segment not found with Shipment Package ${shipmentId}:${shipmentPackageSeqId}"/>
+            </if>
+            <if condition="!packageRouteSeg.trackingCode">
+                <return error="true" message="Tracking number not found with Shipment Package ${shipmentId}:${shipmentPackageSeqId}"/>
+            </if>
             <set field="trackingNumber" from="packageRouteSeg.trackingCode"/>
 
 
             <script>
+                import org.moqui.util.RestClient
+                import org.moqui.util.RestClient.RestResponse
                 <![CDATA[
-                    org.moqui.util.RestClient restClient = ec.service.rest().method(org.moqui.util.RestClient.DELETE)
+                    RestClient restClient = ec.service.rest().method(RestClient.DELETE)
                     .addHeader("Content-Type", "application/json").jsonObject(requestMap)
                     .addHeader("Authorization", "Bearer ${apiToken}")
                     restClient.uri().protocol("https")
                     .host("app.staging.shippit.com").port(443).path("api/3/orders/${trackingNumber}").build()
-                    org.moqui.util.RestClient.RestResponse restResponse = restClient.call()
+                    RestClient.RestResponse restResponse = restClient.call()
                     if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
                         ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}")
                         return
