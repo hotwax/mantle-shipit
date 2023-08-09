@@ -22,8 +22,7 @@
                 <field-map field-name="optionEnumId" value="SgoApiToken"/>
             </entity-find-one>
             <if condition="!apiTokenOpt">
-                <log level="error" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
-                <return/>
+                <return error="true" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
             </if>
             <set field="apiToken" from="apiTokenOpt?.optionValue"/>
 
@@ -49,6 +48,9 @@
                     <entity-update value-field="routeSegment"/>
                 </if>
             </if>
+            <if condition="!routeSegment.carrierPartyId">
+                <return error="true" message="This ShipmentID ${shipmentId} has no carrierPartyId, not getting rates"/>
+            </if>
 
             <!--  ==============  Weight  ==============  -->
 
@@ -57,20 +59,17 @@
                 <field-map field-name="shipmentPackageSeqId"/>
             </entity-find-one>
             <if condition="!shipmentPackage">
-                <log level="error" message="This shipmentId ${shipmentId} has no Shipment package, not getting rates"/>
-                <return/>
+                <return error="true" message="This shipmentId ${shipmentId} has no Shipment package, not getting rates"/>
             </if>
             <if condition="!shipmentPackage.weight">
-                <log level="error" message="This shipmentId ${shipmentId} has no weight in Shipment package, not getting rates"/>
-                <return/>
+                <return error="true" message="This shipmentId ${shipmentId} has no weight in Shipment package, not getting rates"/>
             </if>
             <entity-find-one entity-name="mantle.order.OrderItem" value-field="orderItem">
                 <field-map field-name="orderId" />
                 <field-map field-name="orderItemSeqId"/>
             </entity-find-one>
             <if condition="!orderItem.quantity">
-                <log level="error" message="This shipmentId ${shipmentId} has no quantity in Order Item, not getting rates"/>
-                <return/>
+                <return error="true" message="This shipmentId ${shipmentId} has no quantity in Order Item, not getting rates"/>
             </if>
 
 
@@ -83,8 +82,23 @@
                 <field-map field-name="geoId" from="destAddress.stateProvinceGeoId"/>
             </entity-find-one>
 
+            <!--  ==============  Carrier_Id  ==============  -->
+
+            <entity-find-one entity-name="mantle.shipment.carrier.ShippingGatewayMethod" value-field="gatewayMethod">
+                <field-map field-name="shippingGatewayConfigId"/>
+                <field-map field-name="carrierPartyId" from="routeSegment.carrierPartyId"/>
+                <field-map field-name="shipmentMethodEnumId" from="routeSegment.shipmentMethodEnumId"/>
+            </entity-find-one>
+            <if condition="!gatewayMethod">
+                <return error="true" message="Shipping Gateway ${shippingGatewayConfigId} has no carrier, not getting rates"/>
+            </if>
+            <if condition="!gatewayMethod.gatewayServiceCode">
+                <return error="true" message="Shipping Gateway ${shippingGatewayConfigId} has no service code, not getting rates"/>
+            </if>
+            <set field="method" from="gatewayMethod.gatewayServiceCode"/>
+
             <set field="requestMap" from="[quote:[dropoff_postcode:destAddress.postalCode,dropoff_state:destState.geoCodeAlpha2,
-                        dropoff_suburb:destAddress.city,parcel_attributes:[[qty:orderItem.quantity,weight:shipmentPackage.weight]]]]"/>
+                        dropoff_suburb:destAddress.city,parcel_attributes:[[qty:orderItem.quantity,weight:shipmentPackage.weight]],service_levels:method]]"/>
 
             <script>
                 import org.moqui.util.RestClient
@@ -132,8 +146,7 @@
                 <field-map field-name="optionEnumId" value="SgoApiToken"/>
             </entity-find-one>
             <if condition="!apiTokenOpt">
-                <log level="error" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
-                <return/>
+                <return error="true" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
             </if>
             <set field="apiToken" from="apiTokenOpt?.optionValue"/>
 
@@ -160,7 +173,7 @@
                 </if>
             </if>
             <if condition="!routeSegment.carrierPartyId">
-                <log level="error" message="This ShipmentID ${shipmentId} has no carrierPartyId, not getting rates"/>
+                <return error="true" message="This ShipmentID ${shipmentId} has no carrierPartyId, not getting rates"/>
             </if>
 
 
@@ -171,12 +184,10 @@
                 <field-map field-name="shipmentPackageSeqId"/>
             </entity-find-one>
             <if condition="!shipmentPackage">
-                <log level="error" message="This shipmentId ${shipmentId} has no Shipment package, not getting rates"/>
-                <return/>
+                <return error="true" message="This shipmentId ${shipmentId} has no Shipment package, not getting rates"/>
             </if>
             <if condition="!shipmentPackage.weight">
-                <log level="error" message="This shipmentId ${shipmentId} has no weight in Shipment package, not getting rates"/>
-                <return/>
+                <return error="true" message="This shipmentId ${shipmentId} has no weight in Shipment package, not getting rates"/>
             </if>
             <entity-find-one entity-name="mantle.order.OrderItem" value-field="orderItem">
                 <field-map field-name="orderId" />
@@ -191,12 +202,10 @@
                 <field-map field-name="shipmentMethodEnumId" from="routeSegment.shipmentMethodEnumId"/>
             </entity-find-one>
             <if condition="!gatewayMethod">
-                <log level="error" message="Shipping Gateway ${shippingGatewayConfigId} has no carrier, not getting rates"/>
-                <return/>
+                <return error="true" message="Shipping Gateway ${shippingGatewayConfigId} has no carrier, not getting rates"/>
             </if>
             <if condition="!gatewayMethod.gatewayServiceCode">
-                <log level="error" message="Shipping Gateway ${shippingGatewayConfigId} has no service code, not getting rates"/>
-                <return/>
+                <return error="true" message="Shipping Gateway ${shippingGatewayConfigId} has no service code, not getting rates"/>
             </if>
             <set field="method" from="gatewayMethod.gatewayServiceCode"/>
 
@@ -267,17 +276,12 @@
     </service>
 
 
-    <!-- ============================================= -->
+    <!-- =============================================== -->
     <!-- ========== Create Label Service =============== -->
-    <!-- ============================================= -->
+    <!-- =============================================== -->
 
-    <service verb="get" noun="CreateLabel">
-        <in-parameters>
-            <parameter name="shipmentId" required="true"/>
-            <parameter name="shipmentRouteSegmentSeqId" required="true"/>
-            <parameter name="shipmentPackageSeqId"/>
-            <parameter name="shippingGatewayConfigId" required="true"/>
-        </in-parameters>
+    <service verb="get" noun="ShippingLabel">
+        <implements service="mantle.shipment.CarrierServices.request#ShippingLabels"/>
         <out-parameters>
             <parameter name="responseMap"/>
         </out-parameters>
@@ -290,8 +294,7 @@
                 <field-map field-name="optionEnumId" value="SgoApiToken"/>
             </entity-find-one>
             <if condition="!apiTokenOpt">
-                <log level="error" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
-                <return/>
+                <return error="true" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
             </if>
             <set field="apiToken" from="apiTokenOpt?.optionValue"/>
 
@@ -307,7 +310,7 @@
             </if>
             <entity-find-one entity-name="mantle.shipment.ShipmentPackage" value-field="packages"/>
             <if condition="packages == null">
-                <log level="warn" message="Shipment Package not found with ID ${shipmentId}:${shipmentPackageSeqId}"/>
+                <return error="true" message="Shipment Package not found with ID ${shipmentId}:${shipmentPackageSeqId}"/>
             </if>
 
 
@@ -362,7 +365,7 @@
     <!-- ========== Void Label Service =============== -->
     <!-- ============================================= -->
 
-    <service verb="delete" noun="CancelOrder">
+    <service verb="void" noun="ShippingLabel">
         <in-parameters>
             <parameter name="shipmentId" required="true"/>
             <parameter name="shipmentRouteSegmentSeqId" required="true"/>
@@ -381,8 +384,7 @@
                 <field-map field-name="optionEnumId" value="SgoApiToken"/>
             </entity-find-one>
             <if condition="!apiTokenOpt">
-                <log level="error" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
-                <return/>
+                <return error="true" message="Shipping gateway ${shippingGatewayConfigId} has no ApiToken, not getting rates"/>
             </if>
             <set field="apiToken" from="apiTokenOpt?.optionValue"/>
 
@@ -399,7 +401,7 @@
             </if>
             <entity-find-one entity-name="mantle.shipment.ShipmentPackage" value-field="packages"/>
             <if condition="packages == null">
-                <log level="warn" message="Shipment Package not found with ID ${shipmentId}:${shipmentPackageSeqId}"/>
+                <return error="true" message="Shipment Package not found with ID ${shipmentId}:${shipmentPackageSeqId}"/>
             </if>
 
 
