@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-facade-xml type="seed">
+    <moqui.basic.Enumeration description="Shippit REST API" enumId="ShGtwyShippit" enumTypeId="ShippingGatewayType"/>
+    <moqui.basic.Enumeration description="Shippit Gateway Options" enumId="EgShippitOption" enumTypeId="EnumGroup"/>
+    <moqui.basic.Enumeration sequenceNum="10" description="On Demand" enumId="ShMthOnDemand" enumTypeId="ShipmentMethod"/>
+    <moqui.basic.EnumGroupMember enumGroupEnumId="EgShippitOption" enumId="ShGtwyShippit" sequenceNum="1"/>
+</entity-facade-xml>
